@@ -1,0 +1,372 @@
+---
+title: "Estimation of Healthcare Accessiblity using Automated Map Queries"
+author: "JK Kim/YD Hwang"
+date: "2/5/2019"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(knitr)
+library(rmarkdown)
+library(kableExtra)
+```
+
+# Introduction
+
+## Background
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/FMC2_eng.png")
+```
+
+## Goal
+
+- Estimating the average FMC-to-door time for 
+    - each (small) area
+    - national level
+- Estimating the average "success probability" of FMC-to-door time $<$ 30 minutes
+
+To provide a fundamental information for public health policy 
+
+## Traditional statistical approaches
+
+Statistical estimation based on probability sampling -- survey sample based
+
+- Pros
+    - Study method is well estabilished
+- Cons
+    - Costly to collect the data
+    - Difficult to produce the statistics in a fine resolution (small areas)
+    
+## Our approach
+Automated methods to collect the data from simulation -- hybrid of traditional data and "modern" data
+
+- Pros
+    - Can collect much larger, more detailed data with very low cost
+    - Can produce small area statistics 
+- Cons
+    - Need more assumptions on data generating process
+
+## Data description
+
+- Hospital statistics (70-80 % coverage (? unclear; needs more clarification))
+- Statistics Korea Census data (census block demographic population) 
+- Heart attack patients statistics (2016)
+- Nationwide emergency paramedic network (spatial locations)
+- Statistics of hospitals conducting interventional cardiology procedure (spatial locations)
+
+## Main idea
+For each census block
+
+- Estimating the average number of patients 
+- Estimating average FMC-to-door time
+
+
+Estimate the average FMC-to-door time for larger area using the
+estimated average number of patients as weight
+\[
+T = \frac{ \sum_{i=1}^{K} M_{i} T_{i}}{ \sum_{i=1}^{K} M_{i} },
+\] 
+where 
+
+- $i$: census block index 
+- $M_{i}$: expected number of patients for the $i$ th census block 
+- $T_{i}$: expected FMC-to-door time for the $i$ th census block 
+
+## Statistics Korea Census block population statistics
+
+- Five-year old interval for male/female 
+- The numbers are masked when the count is less than five for confidentiality
+- Census block is divided by the (not-easily-changing) large road and facilities for consistency
+- Much smaller area than the smallest administrative areal unit; urban areas tend to have smaller blocks while rural areas tend to have larger blocks. 
+- Total of 102,024 blocks (as of 2016).
+
+## An example in Seoul
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/sajikdong.png")
+```
+Census block is depicted by red lines.
+
+# Estimation
+
+## Two components in estimation
+
+- The expected number of patients for each block: Estimation using hospital statistics and demographic statistics
+- The expected FMC-to-door time: Estimation using online map API simulated query results
+
+
+## Estimating the expected number of patients for each block 
+
+- Demographic information + hospital statistics + patients statistics (administrative data)
+- Idea
+    - Estimate the patients' distribution using hospital statistics (age/sex)
+    - Estimate the patients' distribution for each region 
+    - Estimate the patients' distribution for each census block using census block statistics 
+
+## Notation 
+
+- $N_{ij}$: population in $i$th block, $j$th demographic feature (Known)
+- $M_{ij}$: number of patients in $i$th block, $j$th demographic feature (Unknown)
+- $M_{+j}=\sum_{i=1}^K M_{ij}$: number of patients with $j$th demographic feature
+- $M = \sum_{j=1}^J M_{+j}$: total patients (Known)
+- $P_{j} = M_{+j} / M_{++}$: probability that a patient belonging to $j$th demographic feature 
+- $P_{i \mid j}$: conditional probability that a patient with $j$th demographic feature belongs to the $i$th block 
+- $M_{i+} = \sum_{j=1}^J M_{ij}$: Patients in $i$th block (Target parameter)
+
+
+## Estimating the expected number of patients for each block
+
+
+- Probability distribution of patients for each demographic group: Estimate $P_{j}$ using hospital statistics 
+- Conditional probability $P_{i \mid j}$: Using census data -- assuming that population and patients group have the identitcal conditional probability
+- Expected patients in $i$th block:
+\[ 
+\hat{M}_{i+} = M \times \sum_{j=1}^J \hat{P}_{j} P_{i \mid j},
+\]
+where $\hat{P}_{j}$ is the estimate for $P_{j}$ (obtained from hospital statistics) and $P_{i \mid j}$ is obtained from census statistics.
+
+
+## Example 
+
+\begin{table}[htdp]
+\caption{Probability distribution of patients for each demographic group using hospital statistics}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|c|}
+ \hline
+     & \multicolumn{5}{|c|}{Sex/Age} &  \\
+     \cline{2-6}
+& M/0-5 & F/0-5 & $\cdots $ & M/95-100 & F/95-100 & Total \\
+\hline
+Patients & $n_1$ & $n_2$  &  $\cdots $ & $n_{39}$ & $n_{40}$ & $n=8469$  \\
+\hline
+ratio ($\hat{P}_j$) &  $n_1/n$ & $n_2/n$ & $\cdots $ & $n_{39}/n$ & $n_{40}/n$ & 1 \\
+   \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+## Example (cont'd)
+
+\begin{table}[htdp]
+\caption{Estimating the distribution using the 2016 patients statistics (Total = $M$, blocks = 50) }
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|c|}
+ \hline
+    & \multicolumn{5}{|c|}{Sex/Age} &  \\
+    \cline{2-6}
+block ID & M/0-5 & F/0-5 & $\cdots $ & M/95-100 & F/95-100 & Total \\
+\hline
+ 1 & \textcolor{red}{$M_{1,1}$}  & \textcolor{red}{$M_{1,2}$} &  &  \textcolor{red}{$M_{1,39}$} &  \textcolor{red}{$M_{1,40}$} &  \textcolor{red}{$M_{1,+}$} \\
+   2& \textcolor{red}{$M_{2,1}$}  & \textcolor{red}{$M_{2,2}$} &  &  \textcolor{red}{$M_{2,39}$} &  \textcolor{red}{$M_{2,40}$} &  \textcolor{red}{$M_{2,+}$}  \\
+  $\vdots$ & & & & & & \\
+      50& \textcolor{red}{$M_{50,1}$}  & \textcolor{red}{$M_{50,2}$} &  &  \textcolor{red}{$M_{50,39}$} &  \textcolor{red}{$M_{50,40}$} & \textcolor{red}{$M_{50, +}$}   \\
+\hline
+Patients  &  $M \times \hat{P}_1$ & $M \times \hat{P}_2$ & $\cdots $ & $M \times \hat{P}_{39}$ & $M\times\hat{P}_{40}$ & $M$  \\
+   \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+## Example (cont'd)
+
+\begin{table}[htdp]
+\caption{Conditional probability using census statistics}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+ \hline
+    & \multicolumn{5}{|c|}{Sex/Age}  \\
+    \cline{2-6}
+block  ID & M/0-5 & F/0-5 & $\cdots$ & M/95-100 & F/95-100\\
+\hline
+1 & {$N_{1,1}$}  & {$N_{1,2}$} &  &  {$N_{1,39}$} &  {$N_{1,40}$} \\
+2 & {$N_{2,1}$}  & {$N_{2,2}$} &  &  {$N_{2,39}$} &  {$N_{2,40}$}  \\
+  $\vdots$ & & & & &  \\
+      50& {$N_{50,1}$}  & {$N_{50,2}$} &  & {$N_{50,39}$} &  {$N_{50,40}$}  \\
+\hline
+Total pop   &  $N_{+,1}$ & $N_{+,2}$ & $\cdots $ & $N_{+,39}$ & $N_{+,40}$  \\
+   \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+- Conditional Probability : $P_{ i \mid j} =N_{i,j}/N_{+, j}$
+- $\hat{M}_{ij} = M \times \hat{P}_j  \times P_{ i \mid j}$
+- $\hat{M}_{i+} =  \sum_j \hat{M}_{ij}$
+
+## Calculated Weights
+
+```{r, echo=FALSE, dpi=500, fig.align='center'}
+include_graphics(path = "figures/weight_map.png")
+```
+
+## Estimating FMC-to-door time for each block
+
+1. Sampling a coordinate 
+1. Geocoding: a coordinate $\rightarrow$ an address
+1. Using the API query results 
+    - Search the nearest hospital and calculate the travel time
+    - Search the nearest paramedic station and calculate the travel time
+1. Combine two results
+
+## Tools for Estimating FMC-to-door time
+- An API tool called [**T Map**](http://tmapapi.sktelecom.com/main.html) was used
+- Provides an Open API for various map-based services 
+    - (optimal) travel route search
+    - Address search
+    - Point of interest (e.g., "Coffee near Seoul Station")
+    - Real time traffic
+    - etc
+
+## API is convenient but **not** free
+- Much cheaper than traditional approach but not free for purpose of massive data collection 
+    - Network maintenence
+    - Service maintenence
+    - Service charge for data query is one of the most important revenue source for map service provider (e.g., Google map for Uber/Lyft)
+
+## Challenge: Design of query experiment
+Query is *constrained*
+
+- geocoding  (coordinate - address) : 100K queries per day/ 20 queries per second
+- route search (coordinate - coordinate or address - address) : 50K queries per day/ 5 queries per second
+- The constraints are placed because intensive use of queries can be very demanding for the system
+
+## Designing the query experiment
+
+- Travel time is affected by the traffic -- weekly or diurnal pattern (more travel time during the rush hour)
+- Uniformly spread the queries for each locations and time (e.g., Not "Seoul at 7PM and Pusan at 8PM"; but "Seoul at 7PM, Pusan at 7PM, ..., Seoul at 8PM, Pusan at 8PM")
+- Need to consider the query constraints
+- Nearest place (in distance) $\neq$ shortest travel time -- need to consider a few candidates
+    - consumes more queries
+- Need to exclude the "unlikely" locations (e.g., surface of a lake)
+
+## Search process
+
+Obtain the travel time to the nearest hospital from a given location using API
+
+1. Randomly select a coordinate $(x, y)$ on the map  
+1. Search the address from the coordiate (consumes 1 geocoding query)
+    - If a valid address is returned: search the coordinate from the returned address (consumes 1 geocoding query) as the origin
+    - If not (wilderness, river, lake, etc.): stop the process and select a new coordinate
+1. Search two nearest hospitals from the origin
+    - Query the travel time to two hospitals (consumes 2 routes queries)
+    - Select the one with the shorter travel time
+ 
+## An example (matching the nearest address)
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/spatial_query_1.png")
+```
+
+
+## Another example (an unusable coordinate)
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/spatial_query_2.png")
+```
+
+## Final query design
+
+- 250 municipalities (equivalent of counties in US)
+- 24 hours
+- Initiate the query at every hour
+    - Used `crontab` from linux -- automatic scheduler
+    - `R` script -- command-line based execution
+- Choose four points from each municipality
+    - 250 (municipalities) $\times$ 4 (locations) $\times$ 2 (Two hospitals) $\times$ 24(hours) = 48000 / 50000 (Maximum query per day)
+    - Remaining 2000 queries can be used for fixing the code or testing for next step
+- Paramedic network is searched in the reverse direction
+
+## Query results: patient's location $\rightarrow$ hospital
+
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/raw_map_hosp.png")
+```
+
+
+## Query results: paramedic network $\rightarrow$ patient's location}
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/raw_map_119.png")
+```
+
+
+## An example: Sajik-dong in Seoul
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/sajikdong.png")
+```
+
+## Challenge:  Sajik-dong in Seoul
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/sajikdong_overlaid.png")
+```
+- ``Big but not quite big enough'': query results more than 60K cannot provide enough information for each municipality (# of municipalities $>>$ # of queries)
+
+## Jongro-gu (where Sajik-dong belongs to)
+
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/jongrogu.png")
+```
+Observation
+
+- Northern areas tend to take more -- mostly mountains 
+- Southern areas tend to take shorter -- close to the downtown Seoul
+
+## Spatial distance and travel time difference
+
+```{r, echo=FALSE, dpi=500, fig.align='center'}
+include_graphics(path = "figures/variogram.png")
+```
+
+## Spatial smoothing
+```{r, echo=FALSE, dpi=400, fig.align='center'}
+include_graphics(path = "figures/jongrogu-smoothed.png")
+```
+
+## Numerical Integration
+
+
+- Parameter of interest
+\[ 
+T_i = \int_{\Omega_i} T(x) f(x) dx,
+\]
+where $\Omega_i$ is the collection of addresses in $i$th block, $T(x)$ is the travel time from location $x$, $f(x)$ is the probability density at $x$ 
+- Simple Monte Carlo:
+$$ \hat{T}_i = \frac{1}{n_i} \sum_{j=1}^{n_i} T(x_{ij}) $$
+where $x_{ij} \sim f(x) , x \in \Omega_i$.
+- ``Smoothed'' estimate
+   $$ \hat{T}_i^* = \frac{1}{n_i^*} \sum_{j=1}^{n_i^*} \hat{T}(x_{ij}) $$
+   where $\hat{T}(x)$ is the predictor of $T(x)$ from a statistical model (Used Kriging assuming a stationary Gaussian process)
+   
+
+
+## Travel time for paramedic service 
+
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/overall_plot_119.png")
+```
+
+## Travel time: patient's location $\rightarrow$ hospital
+
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/overall_plot_hosp.png")
+```
+
+## Probability of success -- FMC-to-door within 30 mins
+
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/overall_plot_rate.png")
+```
+
+## Average travel time for each municipality 
+
+```{r, echo=FALSE, dpi=700, fig.align='center'}
+include_graphics(path = "figures/hos_sum_pop_plot.png")
+```
+
+
+<!-- render("kick_off.Rmd", output_format = beamer_presentation(includes = includes(in_header  = "beamer-header.tex")), output_file = "kick_off_slide.pdf") -->
+
+
